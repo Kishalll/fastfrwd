@@ -49,7 +49,7 @@ npm start
 - [ ] add playlist history and store reccent playlist links w heading
 - [ ] copy ai's responce link it w the extractor extension
 
-## kill old process - window command
+## kill old process - windows command
 
 ```
 taskkill /F /IM node.exe
