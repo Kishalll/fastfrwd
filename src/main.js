@@ -23,6 +23,10 @@ const state = {
     lastFocused: null,
     onEscape: null,
   },
+  confirmDialog: {
+    resolve: null,
+    lastFocused: null,
+  },
   sourcePanel: {
     open: false,
     lastTrigger: null,
@@ -45,6 +49,12 @@ const els = {
   resumeLater: $('#resume-later'),
   settingsModal: $('#settings-modal'),
   settingsModalCard: $('#settings-modal .modal-card'),
+  confirmModal: $('#confirm-modal'),
+  confirmTitle: $('#confirm-title'),
+  confirmMessage: $('#confirm-message'),
+  confirmDetail: $('#confirm-detail'),
+  confirmCancel: $('#confirm-cancel'),
+  confirmAccept: $('#confirm-accept'),
   settingsClose: $('#settings-close'),
   settingsBackHome: $('#settings-back-home'),
   settingsApiKeyInput: $('#settings-api-key-input'),
@@ -99,6 +109,15 @@ const FOCUSABLE_SELECTOR = [
 ].join(',');
 
 const CHAT_INPUT_PLACEHOLDER = 'Ask a question about your loaded sources...';
+const TRASH_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 7h16" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+    <path d="M6 7l1 14h10l1-14" />
+    <path d="M9 7V4h6v3" />
+  </svg>
+`;
 
 // ===== INIT =====
 async function init() {
@@ -230,7 +249,103 @@ function deactivateModal(modalEl, options = {}) {
   }
 }
 
+function showConfirmDialog({
+  title,
+  message,
+  detail = '',
+  confirmText = 'Confirm',
+  tone = 'danger',
+} = {}) {
+  if (!els.confirmModal) return Promise.resolve(false);
+
+  if (state.confirmDialog.resolve) {
+    closeConfirmDialog(false);
+  }
+
+  state.confirmDialog.lastFocused = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
+
+  els.confirmTitle.textContent = title || 'Confirm action';
+  els.confirmMessage.textContent = message || 'This needs your confirmation.';
+  els.confirmAccept.textContent = confirmText;
+  els.confirmAccept.classList.toggle('btn-danger', tone === 'danger');
+  els.confirmAccept.classList.toggle('btn-primary', tone !== 'danger');
+
+  if (detail) {
+    els.confirmDetail.textContent = detail;
+    els.confirmDetail.classList.remove('hidden');
+  } else {
+    els.confirmDetail.textContent = '';
+    els.confirmDetail.classList.add('hidden');
+  }
+
+  els.confirmModal.classList.remove('hidden');
+  els.confirmModal.setAttribute('aria-hidden', 'false');
+  els.confirmCancel.focus();
+
+  document.removeEventListener('keydown', handleConfirmKeydown, true);
+  document.addEventListener('keydown', handleConfirmKeydown, true);
+
+  return new Promise((resolve) => {
+    state.confirmDialog.resolve = resolve;
+  });
+}
+
+function closeConfirmDialog(result) {
+  if (!els.confirmModal) return;
+
+  const resolve = state.confirmDialog.resolve;
+  state.confirmDialog.resolve = null;
+  els.confirmModal.classList.add('hidden');
+  els.confirmModal.setAttribute('aria-hidden', 'true');
+  document.removeEventListener('keydown', handleConfirmKeydown, true);
+
+  const restoreTarget = state.confirmDialog.lastFocused;
+  state.confirmDialog.lastFocused = null;
+  if (restoreTarget && typeof restoreTarget.focus === 'function') {
+    restoreTarget.focus();
+  }
+
+  if (resolve) resolve(Boolean(result));
+}
+
+function handleConfirmKeydown(event) {
+  if (!state.confirmDialog.resolve || !els.confirmModal) return;
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    closeConfirmDialog(false);
+    return;
+  }
+
+  if (event.key !== 'Tab') return;
+  event.stopPropagation();
+
+  const focusable = getFocusableElements(els.confirmModal);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    els.confirmModal.querySelector('.confirm-card')?.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function handleModalKeydown(event) {
+  if (state.confirmDialog.resolve) return;
+
   const modalEl = state.modal.active;
   if (!modalEl) return;
 
@@ -280,7 +395,7 @@ function maybeShowResumeModal() {
     parts.push(`Files: ${u.heldFiles || 0} paused, ${u.failedFiles || 0} failed`);
   }
 
-  showResumeModal(parts.join(' • '));
+  showResumeModal(parts.join(' | '));
 }
 
 async function resumeHeldJobs() {
@@ -345,6 +460,8 @@ function setupEventListeners() {
   }
   if (els.settingsDeleteKey) els.settingsDeleteKey.addEventListener('click', deleteSettingsApiKey);
   if (els.settingsClearSources) els.settingsClearSources.addEventListener('click', clearAllSourcesFromSettings);
+  if (els.confirmCancel) els.confirmCancel.addEventListener('click', () => closeConfirmDialog(false));
+  if (els.confirmAccept) els.confirmAccept.addEventListener('click', () => closeConfirmDialog(true));
   if (els.settingsClearChat) {
     els.settingsClearChat.addEventListener('click', async () => {
       await clearChat();
@@ -649,9 +766,11 @@ async function saveSettingsApiKey() {
 }
 
 async function deleteSettingsApiKey() {
-  const confirmed = window.confirm(
-    'Delete saved API key from this workspace?\n\nYou will stay in chat, but sending new messages and processing sources will require adding a key again.'
-  );
+  const confirmed = await showConfirmDialog({
+    title: 'Delete saved API key?',
+    message: 'You will stay in chat, but sending messages and processing sources will require adding a key again.',
+    confirmText: 'Delete key',
+  });
   if (!confirmed) return;
 
   els.settingsDeleteKey.disabled = true;
@@ -1049,7 +1168,7 @@ function handlePlaylistEvent(data) {
       els.statChunks.textContent = data.totalChunksInStore;
     }
     if (typeof data.totalSourcesInStore === 'number' && typeof data.totalChunksInStore === 'number') {
-      els.chatSubtitle.textContent = `${data.totalSourcesInStore} sources ready • ${data.totalChunksInStore} study sections indexed`;
+      els.chatSubtitle.textContent = `${data.totalSourcesInStore} sources ready | ${data.totalChunksInStore} study sections indexed`;
     }
     if (data.status === 'done' || data.status === 'failed' || data.status === 'skipped') {
       scheduleSourceSync();
@@ -1088,6 +1207,24 @@ function scheduleSourceSync() {
   }, 300);
 }
 
+function getStatusMeta(status) {
+  const map = {
+    processing: { label: 'Processing', tone: 'working' },
+    embedding: { label: 'Embedding', tone: 'working' },
+    done: { label: 'Ready', tone: 'done' },
+    failed: { label: 'Failed', tone: 'failed' },
+    skipped: { label: 'Skipped', tone: 'skipped' },
+    pending: { label: 'Pending', tone: 'pending' },
+    held: { label: 'Paused', tone: 'held' },
+  };
+  return map[status] || map.pending;
+}
+
+function statusIconHtml(status, className = 'status-icon') {
+  const meta = getStatusMeta(status);
+  return `<span class="${className} status-${meta.tone}" role="img" aria-label="${meta.label}" title="${meta.label}"></span>`;
+}
+
 function addVideoItem(id, title, duration, status) {
   const safeTitle = escapeHtml(title);
   const safeDuration = escapeHtml(duration);
@@ -1099,11 +1236,11 @@ function addVideoItem(id, title, duration, status) {
     item.dataset.sourceId = `video_${id}`;
     item.dataset.sourceType = 'video';
     item.innerHTML = `
-      <span class="status-icon">⏳</span>
+      ${statusIconHtml(status)}
       <span class="video-title" title="${safeTitle}">${safeTitle}</span>
       <span class="video-duration">${safeDuration}</span>
       <button class="source-retry-btn hidden" title="Retry indexing this video" data-video-id="${id}">Retry</button>
-      <button class="source-remove-btn hidden" title="Remove this transcript source" data-source-id="video_${id}" data-source-type="video">🗑</button>
+      <button class="source-remove-btn hidden" title="Remove this transcript source" aria-label="Remove this transcript source" data-source-id="video_${id}" data-source-type="video">${TRASH_ICON}</button>
     `;
     els.videoList.appendChild(item);
   } else {
@@ -1131,9 +1268,10 @@ function addVideoItem(id, title, duration, status) {
       const removeBtn = document.createElement('button');
       removeBtn.className = 'source-remove-btn hidden';
       removeBtn.title = 'Remove this transcript source';
+      removeBtn.setAttribute('aria-label', 'Remove this transcript source');
       removeBtn.dataset.sourceId = `video_${id}`;
       removeBtn.dataset.sourceType = 'video';
-      removeBtn.textContent = '🗑';
+      removeBtn.innerHTML = TRASH_ICON;
       item.appendChild(removeBtn);
     }
   }
@@ -1147,14 +1285,14 @@ function updateVideoItem(videoId, status, message) {
 
   item.dataset.status = status;
 
-  const iconMap = {
-    processing: '⏳', embedding: '🔄', done: '✅',
-    failed: '❌', skipped: '⏭️', pending: '⏳', held: '⏸️',
-  };
-
-  item.querySelector('.status-icon').textContent = iconMap[status] || '⏳';
-  if (status === 'done') item.classList.add('done');
-  if (status === 'failed') item.classList.remove('done');
+  const meta = getStatusMeta(status);
+  const statusIcon = item.querySelector('.status-icon');
+  if (statusIcon) {
+    statusIcon.className = `status-icon status-${meta.tone}`;
+    statusIcon.setAttribute('aria-label', meta.label);
+    statusIcon.setAttribute('title', meta.label);
+  }
+  item.classList.toggle('done', status === 'done');
 
   const removeBtn = item.querySelector('.source-remove-btn');
   const retryBtn = item.querySelector('.source-retry-btn');
@@ -1241,7 +1379,6 @@ async function uploadFiles(files) {
 function addFileItem(filename, status, info) {
   const ext = escapeHtml(filename.split('.').pop().toUpperCase());
   const safeFilename = escapeHtml(filename);
-  const iconMap = { done: '✅', failed: '❌', pending: '⏳', held: '⏸️', processing: '⏳', embedding: '🔄' };
 
   // Reuse existing row for this source/file when possible
   let item = null;
@@ -1286,9 +1423,9 @@ function addFileItem(filename, status, info) {
     <div class="file-item-header">
       <span class="file-badge">${ext}</span>
       <span class="file-name" title="${safeFilename}">${safeFilename}</span>
-      <span class="file-status">${iconMap[status] || '⏳'}</span>
+      ${statusIconHtml(status, 'file-status')}
       <button class="source-retry-btn ${showRetry ? '' : 'hidden'}" title="Retry indexing this file" data-item-id="${itemId}">Retry</button>
-      <button class="source-remove-btn ${showRemove ? '' : 'hidden'}" title="Remove this file source" data-source-id="${sourceId}" data-source-type="file">🗑</button>
+      <button class="source-remove-btn ${showRemove ? '' : 'hidden'}" title="Remove this file source" aria-label="Remove this file source" data-source-id="${sourceId}" data-source-type="file">${TRASH_ICON}</button>
     </div>
     ${errorMsgHtml}
   `;
@@ -1606,9 +1743,12 @@ async function clearChat() {
 }
 
 async function clearAllSourcesFromSettings() {
-  const confirmed = window.confirm(
-    'Clear all indexed sources and reset workspace data?\n\nThis removes playlist transcripts, uploaded document chunks, and chat memory.'
-  );
+  const confirmed = await showConfirmDialog({
+    title: 'Clear all sources?',
+    message: 'This removes playlist transcripts, uploaded document chunks, and chat memory.',
+    detail: 'Your API key stays connected.',
+    confirmText: 'Clear sources',
+  });
   if (!confirmed) return;
 
   els.settingsClearSources.disabled = true;
@@ -1695,7 +1835,7 @@ function updateKnowledgeStats(sources, totalChunks) {
   els.statChunks.textContent = totalChunks;
 
   if (sources.length > 0) {
-    els.chatSubtitle.textContent = `${sources.length} sources ready • ${totalChunks} study sections indexed`;
+    els.chatSubtitle.textContent = `${sources.length} sources ready | ${totalChunks} study sections indexed`;
   } else {
     els.chatSubtitle.textContent = 'Skip long playlists. Load sources and ask your first question.';
   }
@@ -1921,7 +2061,12 @@ async function retryUploadedFile(itemId, button) {
 
 async function removeKnowledgeSource(sourceId, sourceType, label, row, button) {
   const thing = sourceType === 'video' ? 'transcript' : 'file';
-  const confirmed = window.confirm(`Remove this ${thing} from your sources?\n\n${label}\n\nThis action cannot be undone.`);
+  const confirmed = await showConfirmDialog({
+    title: `Remove this ${thing}?`,
+    message: 'This source will be removed from the indexed knowledge base.',
+    detail: label,
+    confirmText: 'Remove source',
+  });
   if (!confirmed) return;
 
   button.disabled = true;

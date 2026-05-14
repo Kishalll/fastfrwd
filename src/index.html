@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FastFrwd — Learn Playlists Faster</title>
+  <title>FastFrwd | Learn Playlists Faster</title>
   <meta name="description" content="Students waste hours watching full playlists. FastFrwd turns playlists and study files into source-grounded answers so you learn faster." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,7 +12,7 @@
 </head>
 <body>
   <div id="app">
-    <!-- Animated background -->
+    <!-- Background -->
     <div class="bg-grid"></div>
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
@@ -21,7 +21,13 @@
     <!-- API Key Modal -->
     <div id="api-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="api-modal-title" aria-describedby="api-modal-desc" aria-hidden="true">
       <div class="modal-card" tabindex="-1">
-        <div class="modal-icon">🔑</div>
+        <div class="modal-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8" cy="15" r="4" />
+            <path d="M11 12l7-7" />
+            <path d="M15 5h4v4" />
+          </svg>
+        </div>
         <h2 id="api-modal-title">Welcome to FastFrwd</h2>
         <p id="api-modal-desc">Enter your NVIDIA API key to start. You can get a free key from <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a></p>
         <div class="input-group">
@@ -38,7 +44,13 @@
     <!-- Resume Modal -->
     <div id="resume-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="resume-modal-title" aria-describedby="resume-modal-summary" aria-hidden="true">
       <div class="modal-card" tabindex="-1">
-        <div class="modal-icon">⏯️</div>
+        <div class="modal-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6v12l7-6-7-6Z" />
+            <path d="M14 7h2.5A3.5 3.5 0 0 1 20 10.5v0A3.5 3.5 0 0 1 16.5 14H14" />
+            <path d="M17 11l3 3-3 3" />
+          </svg>
+        </div>
         <h2 id="resume-modal-title">Resume Interrupted Processing?</h2>
         <p id="resume-modal-summary">We found interrupted items.</p>
         <div class="input-group">
@@ -92,6 +104,28 @@
       </div>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message" aria-hidden="true">
+      <div class="confirm-card" tabindex="-1">
+        <div class="confirm-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 8v5" />
+            <path d="M12 16.5h.01" />
+            <path d="M10.2 3.7 2.9 17a2.2 2.2 0 0 0 1.9 3.3h14.4a2.2 2.2 0 0 0 1.9-3.3L13.8 3.7a2.1 2.1 0 0 0-3.6 0Z" />
+          </svg>
+        </div>
+        <div class="confirm-copy">
+          <h2 id="confirm-title">Confirm action</h2>
+          <p id="confirm-message">This needs your confirmation.</p>
+          <p id="confirm-detail" class="confirm-detail hidden"></p>
+        </div>
+        <div class="confirm-actions">
+          <button id="confirm-cancel" class="btn btn-outline">Cancel</button>
+          <button id="confirm-accept" class="btn btn-danger">Confirm</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Main Layout -->
     <div class="layout" id="main-layout" style="display:none">
       <!-- Sidebar -->
@@ -138,9 +172,16 @@
           <!-- Files Tab -->
           <div class="tab-panel" id="tab-files" role="tabpanel" aria-labelledby="tab-btn-files">
             <div class="drop-zone" id="drop-zone">
-              <div class="drop-zone-icon">📄</div>
-              <p>Drag & drop files here</p>
-              <p class="drop-zone-hint">PDF, DOCX, TXT, MD — up to 30 files</p>
+              <div class="drop-zone-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+                  <path d="M14 3v5h5" />
+                  <path d="M12 12v5" />
+                  <path d="M9.5 14.5 12 12l2.5 2.5" />
+                </svg>
+              </div>
+              <p>Drag and drop files here</p>
+              <p class="drop-zone-hint">PDF, DOCX, TXT, MD, up to 30 files</p>
               <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.md" hidden />
               <button class="btn btn-outline btn-sm" id="browse-files">Browse Files</button>
             </div>
@@ -151,7 +192,18 @@
           <!-- Convert Tab -->
           <div class="tab-panel" id="tab-convert" role="tabpanel" aria-labelledby="tab-btn-convert">
             <div class="convert-card">
-              <div class="convert-icon">📊 → 📄</div>
+              <div class="convert-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 7h14l5 5v13H8V7Z" />
+                  <path d="M22 7v5h5" />
+                  <path d="M13 21v-5" />
+                  <path d="M18 21v-8" />
+                  <path d="M23 21v-4" />
+                  <path d="M35 16h13" />
+                  <path d="m44 12 4 4-4 4" />
+                  <path d="M48 7h8v18H40V15" />
+                </svg>
+              </div>
               <h3>Convert PPT to PDF</h3>
               <p>PowerPoint files need to be converted to PDF before uploading. Use the free converter below:</p>
               <a href="https://www.ilovepdf.com/powerpoint_to_pdf" target="_blank" rel="noopener" class="btn btn-primary" id="convert-link">
