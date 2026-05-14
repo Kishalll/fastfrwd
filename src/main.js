@@ -66,6 +66,7 @@ const els = {
   settingsClearChat: $('#settings-clear-chat'),
   apiKeyInput: $('#api-key-input'),
   apiKeySave: $('#api-key-save'),
+  apiModalClose: $('#api-modal-close'),
   apiHint: $('#api-modal .modal-hint'),
   mainLayout: $('#main-layout'),
   sidebar: $('#sidebar'),
@@ -139,16 +140,20 @@ async function init() {
       return;
     }
 
+    showApp();
+    await refreshKnowledgeAndSnapshots(false);
+
     if (config.hasKey && !config.isValid) {
-      showModal('The saved API key is not working. Enter a new key to update .env.', true);
+      showApiKeyPrompt('The saved API key is not working. Enter a new key to update .env.', true);
       return;
     }
 
-    showModal();
+    showApiKeyPrompt('Add your NVIDIA API key to chat or process sources. You can still prepare links and files.', false);
     return;
   } catch (e) { /* server not ready yet */ }
 
-  showModal('Could not verify the server API key. Start the backend, then try again.', true);
+  showApp();
+  showApiKeyPrompt('Could not verify the server API key. Start the backend, then try again.', true);
 }
 
 async function refreshKnowledgeAndSnapshots(showResumePrompt) {
@@ -164,18 +169,21 @@ function showApp() {
   syncApiKeyDependentUI();
 }
 
-function showModal(message = '', isError = false) {
+function showApiKeyPrompt(message = '', isError = false) {
   if (message) {
     setApiHint(message, isError);
   } else {
-    setApiHint('Your API key is saved in .env and used only by the server.');
+    setApiHint('Add your NVIDIA API key to chat or process sources. You can still prepare links and files.');
   }
   els.apiKeyInput.value = '';
   activateModal(els.apiModal, {
     initialFocus: els.apiKeyInput,
-    onEscape: null,
+    onEscape: closeApiKeyPrompt,
   });
-  els.mainLayout.style.display = 'none';
+}
+
+function closeApiKeyPrompt() {
+  deactivateModal(els.apiModal, { restoreFocus: true });
 }
 
 function showResumeModal(summary) {
@@ -449,6 +457,7 @@ function setupEventListeners() {
   // API Key
   els.apiKeySave.addEventListener('click', saveApiKey);
   els.apiKeyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveApiKey(); });
+  if (els.apiModalClose) els.apiModalClose.addEventListener('click', closeApiKeyPrompt);
   els.changeKey.addEventListener('click', () => openSettingsModal());
   if (els.settingsClose) els.settingsClose.addEventListener('click', closeSettingsModal);
   if (els.settingsBackHome) els.settingsBackHome.addEventListener('click', closeSettingsModal);
@@ -610,11 +619,9 @@ function hasApiKey() {
 
 function syncApiKeyDependentUI() {
   const missingKey = !hasApiKey();
-  if (!state.isStreaming) {
-    els.sendBtn.disabled = missingKey;
-  }
+  if (!state.isStreaming) els.sendBtn.disabled = false;
   els.chatInput.placeholder = missingKey
-    ? 'Add API key in Settings to continue chatting...'
+    ? 'Add API key to chat with your sources...'
     : CHAT_INPUT_PLACEHOLDER;
 }
 
@@ -798,7 +805,7 @@ function requireApiKey(message, statusContainer) {
   if (statusContainer) {
     setStatus(statusContainer, prompt, 'error');
   }
-  openSettingsModal(prompt, true);
+  showApiKeyPrompt(prompt, true);
   return false;
 }
 
@@ -824,7 +831,7 @@ function isApiKeyIssue(message) {
 function handleApiKeyFailure(message) {
   state.apiKey = '';
   syncApiKeyDependentUI();
-  openSettingsModal(`The saved API key failed: ${message}. Add a new key to continue.`, true);
+  showApiKeyPrompt(`The saved API key failed: ${message}. Add a new key to continue.`, true);
 }
 
 // ===== SIDEBAR =====

@@ -38,7 +38,7 @@ npm start
 - [x] api key dialoug box comes briefly on startup- chk api key in the bg
 - [x] file remove from knowledge base
 - [ ] improve ai's explaination 
-- [ ] make all alerts and conformations sent by app not browsers
+- [x] make all alerts and conformations sent by app not browsers
 - [ ] when i ask about a vid , it says bout it but ig it includes unnessary vids as source
 - [ ] does not display all sources propery in chat
 - [x] add cancel button in playlist processing
@@ -46,6 +46,7 @@ npm start
 - [x] conformation msg before clearing
 - [x] check api valdity b4 starting
 - [x] improve settings menu w back button , custom instructions , 
+- [x] better key handling
 - [ ] add playlist history and store reccent playlist links w heading
 - [ ] copy ai's responce link it w the extractor extension
 
